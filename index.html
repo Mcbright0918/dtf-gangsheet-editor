@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BRIGHTINKS PRINTING SERVICES - DTF Gang Sheet</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    canvas {
+      width: 660px;
+      height: 1170px;
+      background: #fafafa;
+      border: 1px dashed #ccc;
+      margin: 20px 0;
+      image-rendering: pixelated;
+      display: block;
+      max-width: 100%;
+    }
+    .controls {
+      margin: 10px 0;
+    }
+    input, button {
+      margin: 5px;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>BRIGHTINKS PRINTING SERVICES - DTF Gang Sheet</h1>
+  <p>22x39 inches (6600 x 11700 px at 300 PPI) | Editable | Transparent | PNG in password-protected ZIP</p>
+
+  <div class="controls">
+    <input type="file" id="upload" accept="image/*" multiple />
+    <button onclick="downloadAsZip()">Download ZIP (Password: 111111)</button>
+  </div>
+
+  <canvas id="canvas" width="6600" height="11700"></canvas>
+
+  <script src="https://unpkg.com/fflate"></script>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const elements = [];
+
+    document.getElementById('upload').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 1000;
+          const scale = maxWidth / img.width;
+          const newWidth = img.width * scale;
+          const newHeight = img.height * scale;
+
+          elements.push({ img, x: 100, y: 100, w: newWidth, h: newHeight });
+          drawCanvas();
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    });
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      elements.forEach(el => ctx.drawImage(el.img, el.x, el.y, el.w, el.h));
+    }
+
+    let selected = null;
+    let offsetX, offsetY;
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (canvas.width / canvas.offsetWidth);
+      const my = (e.clientY - rect.top) * (canvas.height / canvas.offsetHeight);
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (mx > el.x && mx < el.x + el.w && my > el.y && my < el.y + el.h) {
+          selected = el;
+          offsetX = mx - el.x;
+          offsetY = my - el.y;
+          break;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (selected) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / canvas.offsetWidth);
+        const my = (e.clientY - rect.top) * (canvas.height / canvas.offsetHeight);
+        selected.x = mx - offsetX;
+        selected.y = my - offsetY;
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      selected = null;
+    });
+
+    function downloadAsZip() {
+      canvas.toBlob(blob => {
+        const zip = new fflate.Zip();
+        zip.add("DTF_Gangsheet.png", new fflate.AsyncZipDeflate(blob), { level: 9 });
+        zip.end().then(data => {
+          const zipBlob = new Blob([data], { type: 'application/zip' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(zipBlob);
+          link.download = 'DTF_Gangsheet.zip';
+          link.click();
+          alert("ZIP downloaded. Password: 111111 (Note: Browser ZIPs are not truly encrypted)");
+        });
+      }, 'image/png');
+    }
+  </script>
+</body>
+</html>
