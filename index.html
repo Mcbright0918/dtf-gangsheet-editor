@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BRIGHTINKS - DTF Gang Sheet Editor</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f2f3f5;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .controls {
+      margin: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    input[type="file"], button {
+      padding: 10px 15px;
+      border-radius: 6px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+    input[type="file"] {
+      background: #6c757d;
+    }
+    canvas {
+      border: 2px dashed #ccc;
+      background: #fff;
+      width: 660px;
+      height: 1170px;
+      max-width: 100%;
+    }
+    #loader {
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>BRIGHTINKS - DTF Gang Sheet Editor</h1>
+  <p>22 x 39 inches (6600 x 11700 px @ 300 PPI)</p>
+  <div class="controls">
+    <input type="file" id="upload" accept="image/*" multiple />
+    <button onclick="autoArrange()">Auto Arrange</button>
+    <button onclick="deleteSelected()">Delete Selected</button>
+    <button onclick="clearAll()">Clear All</button>
+    <button onclick="downloadCanvas()">Download PNG</button>
+  </div>
+  <canvas id="canvas" width="6600" height="11700"></canvas>
+  <div id="loader">Downloading, please wait...</div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let elements = [];
+    let selected = null;
+    let dragging = false;
+    let resizing = false;
+    let offsetX = 0, offsetY = 0;
+    const resizeHandleSize = 40;
+
+    document.getElementById("upload").addEventListener("change", (e) => {
+      Array.from(e.target.files).forEach(file => {
+        const img = new Image();
