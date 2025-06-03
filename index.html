@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BRIGHTINKS - DTF Gang Sheet Editor</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f2f3f5;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .controls {
+      margin: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    input[type="file"], button {
+      padding: 10px 15px;
+      border-radius: 6px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+    input[type="file"] {
+      background: #6c757d;
+    }
+    canvas {
+      border: 2px dashed #ccc;
+      background: #fff;
+      width: 660px;
+      height: 1170px;
+      max-width: 100%;
+      display: block;
+    }
+    #loader {
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>BRIGHTINKS - DTF Gang Sheet Editor</h1>
+  <p>22 x 39 inches (6600 x 11700 px @ 300 PPI)</p>
+  <div class="controls">
+    <input type="file" id="upload" accept="image/*" multiple />
+    <button onclick="autoArrange()">Auto Arrange</button>
+    <button onclick="deleteSelected()">Delete Selected</button>
+    <button onclick="clearAll()">Clear All</button>
+    <button onclick="downloadCanvas()">Download PNG</button>
+  </div>
+  <canvas id="canvas" width="6600" height="11700"></canvas>
+  <div id="loader">Downloading, please wait...</div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let elements = [];
+    let selected = null;
+    let dragging = false;
+    let resizing = false;
+    let offsetX = 0, offsetY = 0;
+    const handleSize = 100;
+
+    document.getElementById("upload").addEventListener("change", (e) => {
+      Array.from(e.target.files).forEach(file => {
+        const img = new Image();
+        img.onload = () => {
+          elements.push({
+            img,
+            x: 100,
+            y: 100,
+            w: img.naturalWidth,
+            h: img.naturalHeight,
+            aspect: img.naturalWidth / img.naturalHeight
+          });
+          drawCanvas();
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    });
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      elements.forEach(el => {
+        ctx.drawImage(el.img, el.x, el.y, el.w, el.h);
+
+        if (el === selected) {
+          ctx.strokeStyle = "red";
+          ctx.lineWidth = 10;
+          ctx.strokeRect(el.x, el.y, el.w, el.h);
+
+          // Draw resize handle
+          ctx.fillStyle = "red";
+          ctx.fillRect(el.x + el.w - handleSize, el.y + el.h - handleSize, handleSize, handleSize);
+        }
+      });
+    }
+
+    function getMousePos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+        y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function getElementAt(x, y) {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        const isResize = x >= el.x + el.w - handleSize && x <= el.x + el.w &&
+                         y >= el.y + el.h - handleSize && y <= el.y + el.h;
+        const isInside = x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h;
+
+        if (isResize) return { el, mode: "resize" };
+        if (isInside) return { el, mode: "move" };
+      }
+      return null;
+    }
+
+    canvas.addEventListener("mousedown", (e) => {
+      const { x, y } = getMousePos(e);
+      const hit = getElementAt(x, y);
+      if (hit) {
+        selected = hit.el;
+        if (hit.mode === "resize") {
+          resizing = true;
+        } else {
+          dragging = true;
+          offsetX = x - selected.x;
+          offsetY = y - selected.y;
+        }
+        drawCanvas();
+      } else {
+        selected = null;
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      const { x, y } = getMousePos(e);
+      const hit = getElementAt(x, y);
+
+      if (hit?.mode === "resize") {
+        canvas.style.cursor = "nwse-resize";
+      } else if (hit?.mode === "move") {
+        canvas.style.cursor = "move";
+      } else {
+        canvas.style.cursor = "default";
+      }
+
+      if (dragging && selected) {
+        selected.x = x - offsetX;
+        selected.y = y - offsetY;
+        drawCanvas();
+      } else if (resizing && selected) {
+        const newW = Math.max(50, x - selected.x);
+        selected.w = newW;
+        selected.h = newW / selected.aspect;
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      dragging = false;
+      resizing = false;
+    });
+
+    function autoArrange() {
+      let x = 50, y = 50, rowH = 0;
+      elements.forEach(el => {
+        if (x + el.w > canvas.width) {
+          x = 50;
+          y += rowH + 50;
+          rowH = 0;
+        }
+        el.x = x;
+        el.y = y;
+        x += el.w + 50;
+        rowH = Math.max(rowH, el.h);
+      });
+      drawCanvas();
+    }
+
+    function deleteSelected() {
+      if (!selected) return alert("No image selected.");
+      elements = elements.filter(el => el !== selected);
+      selected = null;
+      drawCanvas();
+    }
+
+    function clearAll() {
+      if (confirm("Are you sure you want to clear all images?")) {
+        elements = [];
+        selected = null;
+        drawCanvas();
+      }
+    }
+
+    function downloadCanvas() {
+      document.getElementById("loader").style.display = "block";
+      canvas.toBlob(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "DTF_Gangsheet_300ppi.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        document.getElementById("loader").style.display = "none";
+      }, "image/png");
+    }
+  </script>
+</body>
+</html>
