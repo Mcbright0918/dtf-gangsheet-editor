@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BRIGHTINKS PRINTING SERVICES - DTF Gang Sheet</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f9fafb;
+      padding: 30px 15px;
+      margin: 0;
+      color: #222;
+      user-select: none;
+      min-height: 100vh;
+    }
+    h1 {
+      margin-bottom: 6px;
+      font-weight: 700;
+      font-size: 1.8rem;
+      text-align: center;
+      color: #111827;
+    }
+    p.subtitle {
+      margin-top: 0;
+      font-weight: 500;
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 680px;
+    }
+    canvas {
+      width: 660px;
+      height: 1170px;
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      margin: 20px 0 30px;
+      image-rendering: pixelated;
+      display: block;
+      max-width: 100%;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
+      cursor: default;
+      transition: border-color 0.2s ease;
+    }
+    canvas:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 12px 28px rgb(59 130 246 / 0.25);
+    }
+    .controls {
+      margin: 10px 0 40px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+      width: 100%;
+      max-width: 720px;
+    }
+    input[type="file"] {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1.5px solid #d1d5db;
+      cursor: pointer;
+      background: #fff;
+      font-weight: 500;
+      font-size: 14px;
+      transition: border-color 0.2s ease;
+      flex: 1 1 250px;
+      max-width: 320px;
+    }
+    input[type="file"]:hover {
+      border-color: #3b82f6;
+    }
+    button {
+      padding: 12px 26px;
+      border-radius: 8px;
+      border: none;
+      background-color: #3b82f6;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 4px 14px rgb(59 130 246 / 0.4);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      flex: 0 0 auto;
+      min-width: 140px;
+      user-select: none;
+    }
+    button:hover {
+      background-color: #2563eb;
+      box-shadow: 0 6px 22px rgb(37 99 235 / 0.6);
+    }
+    .instructions {
+      max-width: 680px;
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.5;
+      user-select: text;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    /* Cursor changes for canvas interaction */
+    canvas {
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <h1>BRIGHTINKS PRINTING SERVICES - DTF Gang Sheet</h1>
+  <p class="subtitle">22x39 inches (6600 x 11700 px at 300 PPI) | Editable | Transparent | PNG in ZIP</p>
+
+  <div class="instructions">
+    Upload multiple images, then drag to move or drag the bottom-right corner to resize.<br />
+    Right-click an image to remove it.<br />
+    Use "Auto Arrange Images" to neatly arrange all images.<br />
+    Download the final gang sheet as PNG inside a ZIP file.
+  </div>
+
+  <div class="controls">
+    <input type="file" id="upload" accept="image/*" multiple />
+    <button id="autoArrangeBtn">Auto Arrange Images</button>
+    <button id="downloadZipBtn">Download ZIP</button>
+  </div>
+
+  <canvas id="canvas" width="6600" height="11700"></canvas>
+
+  <script src="https://unpkg.com/fflate"></script>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const elements = [];
+
+    const RESIZE_BOX_SIZE = 20;
+    const MIN_SIZE = 20;
+
+    let selected = null;
+    let offsetX, offsetY;
+    let resizing = false;
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      elements.forEach(el => {
+        ctx.drawImage(el.img, el.x, el.y, el.w, el.h);
+        // Resize handle - subtle square
+        ctx.fillStyle = 'rgba(59,130,246,0.7)';
+        ctx.fillRect(el.x + el.w - RESIZE_BOX_SIZE, el.y + el.h - RESIZE_BOX_SIZE, RESIZE_BOX_SIZE, RESIZE_BOX_SIZE);
+      });
+    }
+
+    document.getElementById('upload').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        const img = new Image();
+        img.onload = () => {
+          // Original size (no scaling)
+          const newWidth = img.naturalWidth;
+          const newHeight = img.naturalHeight;
+
+          // Position images staggered vertically
+          let startX = 100;
+          let startY = 100 + elements.length * (newHeight + 40);
+
+          // Clamp starting position to fit inside canvas (if very big images)
+          startX = clamp(startX, 0, canvas.width - newWidth);
+          startY = clamp(startY, 0, canvas.height - newHeight);
+
+          elements.push({ img, x: startX, y: startY, w: newWidth, h: newHeight });
+          drawCanvas();
+        };
+        img.src = URL.createObjectURL(file);
+      });
+      e.target.value = '';
+    });
+
+    function getElementAt(mx, my) {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (mx > el.x + el.w - RESIZE_BOX_SIZE && mx < el.x + el.w &&
+            my > el.y + el.h - RESIZE_BOX_SIZE && my < el.y + el.h) {
+          return { element: el, isResize: true };
+        }
+        if (mx > el.x && mx < el.x + el.w && my > el.y && my < el.y + el.h) {
+          return { element: el, isResize: false };
+        }
+      }
+      return null;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (canvas.width / canvas.offsetWidth);
+      const my = (e.clientY - rect.top) * (canvas.height / canvas.offsetHeight);
+
+      const hit = getElementAt(mx, my);
+      if (hit) {
+        selected = hit.element;
+        resizing = hit.isResize;
+        if (!resizing) {
+          offsetX = mx - selected.x;
+          offsetY = my - selected.y;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (canvas.width / canvas.offsetWidth);
+      const my = (e.clientY - rect.top) * (canvas.height / canvas.offsetHeight);
+
+      const hover = getElementAt(mx, my);
+      if (hover) {
+        canvas.style.cursor = hover.isResize ? 'nwse-resize' : 'move';
+      } else {
+        canvas.style.cursor = 'default';
+      }
+
+      if (selected) {
+        if (resizing) {
+          selected.w = clamp(mx - selected.x, MIN_SIZE, canvas.width - selected.x);
+          selected.h = clamp(my - selected.y, MIN_SIZE, canvas.height - selected.y);
+        } else {
+          selected.x = clamp(mx - offsetX, 0, canvas.width - selected.w);
+          selected.y = clamp(my - offsetY, 0, canvas.height - selected.h);
+        }
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      selected = null;
+      resizing = false;
+    });
+
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (canvas.width / canvas.offsetWidth);
+      const my = (e.clientY - rect.top) * (canvas.height / canvas.offsetHeight);
+
+      const hit = getElementAt(mx, my);
+      if (hit) {
+        if (confirm('Remove this image?')) {
+          const idx = elements.indexOf(hit.element);
+          if (idx > -1) {
+            elements.splice(idx, 1);
+            drawCanvas();
+          }
+        }
+      }
+    });
+
+    function autoArrange() {
+      const padding = 50;
+      let x = padding;
+      let y = padding;
+      let rowHeight = 0;
+
+      elements.forEach(el => {
+        if (x + el.w > canvas.width) {
+          x = padding;
+          y += rowHeight + padding;
+          rowHeight = 0;
+        }
+        el.x = x;
+        el.y = y;
+        x += el.w + padding;
+        rowHeight = Math.max(rowHeight, el.h);
+      });
+      drawCanvas();
+    }
+
+    function downloadAsZip() {
+      if (elements.length === 0) {
+        alert("Please upload and arrange some images before downloading.");
+        return;
+      }
+      if (!confirm("Download the gang sheet as a ZIP file?")) {
+        return;
+      }
+      canvas.toBlob(blob => {
+        const zip = new fflate.Zip();
+        zip.add("DTF_Gangsheet.png", new fflate.AsyncZipDeflate(blob), { level: 9 });
+        zip.end().then(data => {
+          const zipBlob = new Blob([data], { type: 'application/zip' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(zipBlob);
+          link.download = 'DTF_Gangsheet.zip';
+          link.click();
+        });
+      }, 'image/png');
+    }
+
+    document.getElementById('autoArrangeBtn').onclick = autoArrange;
+    document.getElementById('downloadZipBtn').onclick = downloadAsZip;
+  </script>
+</body>
+</html>
